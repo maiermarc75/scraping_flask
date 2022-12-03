@@ -1,43 +1,28 @@
-from flask import Flask, render_template, url_for
-
-# from markupsafe import escape
+from flask import Flask, redirect, render_template, request, url_for
+from repli360 import ScrapingEngine
 
 app = Flask(__name__)
+
+property_info = {}
 
 
 @app.route("/")
 def index():
-    return "index"
+    return render_template("index.html", property_info=property_info)
 
 
-@app.route("/login")
-def login():
-    return "login"
+@app.route("/scrap", methods=["POST"])
+def scrap():
+    global property_info
+    _url = request.form.get("url")
+    scrapobj = ScrapingEngine()
+    property_info = scrapobj.run(_url)
+    return redirect(url_for("index"))
 
 
-@app.route("/user/<username>")
-def profile(username):
-    return f"{username}'s profile"
-
-
-# @app.route('/login', methods=['GET', 'POST'])
-# def login():
-#     if request.method == 'POST':
-#         return do_the_login()
-#     else:
-#         return show_the_login_form()
-
-with app.test_request_context():
-    print(url_for("index"))
-    print(url_for("login"))
-    print(url_for("login", next="/"))
-    print(url_for("profile", username="John Doe"))
-
-
-@app.route("/hello/")
-@app.route("/hello/<name>")
-def hello(name=None):
-    return render_template("hello.html", name=name)
+@app.errorhandler(404)
+def not_found(error):
+    return redirect(url_for("index"))
 
 
 app.run(host="0.0.0.0", debug=True)
