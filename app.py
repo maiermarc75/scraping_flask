@@ -28,11 +28,6 @@ def index():
 
 @app.route("/scrap", methods=["POST"])
 def scrap():
-    try:
-        raise Exception("pass exception")
-    except Exception as e:
-        sentry_sdk.capture_exception(e)
-        # pass
     global scraping_data
     _url = request.form.get("url")
     scraping_data = get_scraping_data(_url)
