@@ -9,6 +9,7 @@ services = [
     "spherexx",
     "pedcorliving",
     "entrata",
+    "myzeki"
 ]
 
 

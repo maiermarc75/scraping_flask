@@ -7,6 +7,10 @@ from bs4 import BeautifulSoup
 
 from scrape import setting
 
+class Scraping:
+    def __init__(self) -> None:
+        self.source_url = ""
+        self.scraped_data = {}
 
 def get_scraping_data(_url):
     url, resp = valid_url(_url)
@@ -15,7 +19,9 @@ def get_scraping_data(_url):
     engine_module = importlib.import_module(module_path)  # engine module
     engine_class = getattr(engine_module, "ScrapingEngine")
     scrape_engine = engine_class()
-    property_info = scrape_engine.run(url, resp)
+    scraping_task = Scraping()
+    scraping_task.source_url = url
+    property_info = scrape_engine.run(scraping_task)
     return property_info
 
 
