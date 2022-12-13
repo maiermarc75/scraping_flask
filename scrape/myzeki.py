@@ -3,45 +3,41 @@ import io
 import re
 
 import requests
-from django.core.files import File
 from bs4 import BeautifulSoup
+from django.core.files import File
+from geopy.geocoders import Nominatim
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from geopy.geocoders import Nominatim
+
 from scrape.setting import state_lookup_dict
 
 
-class ScrapingEngine():
-
+class ScrapingEngine:
     def run(self, scraping_task):
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0",
         }
         self.main_url = scraping_task.source_url
- 
+
         # try:
         self.main_soup = self.get_soup(self.main_url)
         property_info = {}
         link_group = self.get_link()
         property_info = link_group.copy()
-        property_info.update(self.get_cominfo())
+        # property_info.update(self.get_cominfo())
 
-        property_info.update(self.get_amenity(link_group["amenities_link"]))
-        property_info["propertyphoto_set"] = self.get_photos(
-            link_group["gallery_link"], property_info["name"]
-        )
+        # property_info.update(self.get_amenity(link_group["amenities_link"]))
+        # property_info["propertyphoto_set"] = self.get_photos(
+        #     link_group["gallery_link"], property_info["name"]
+        # )
         property_info["propertyunit_set"] = self.get_floorplan(
             link_group["floorplans_link"]
         )
         property_info["state"] = state_lookup_dict[property_info["state"]]
-        property_info["latitude"] = "{:8.5f}".format(
-            float(property_info["latitude"])
-        )
-        property_info["longitude"] = "{:8.5f}".format(
-            float(property_info["longitude"])
-        )
+        property_info["latitude"] = "{:8.5f}".format(float(property_info["latitude"]))
+        property_info["longitude"] = "{:8.5f}".format(float(property_info["longitude"]))
         scraping_task.scraped_data = property_info.copy()
         return scraping_task
         # except Exception as err:
@@ -49,7 +45,9 @@ class ScrapingEngine():
         #     raise ValidationErr(err)
 
     def get_link(self):
-        menu_list = self.main_soup.find_all("div", attrs={"class": "menu-sidebar__element"})
+        menu_list = self.main_soup.find_all(
+            "div", attrs={"class": "menu-sidebar__element"}
+        )
         link_obj = {}
         for item in menu_list:
             if item.a == None:
@@ -73,7 +71,9 @@ class ScrapingEngine():
     def get_photos(self, gallery_link, property_name):
         photo_soup = self.get_soup(gallery_link)
         img_div_tag_list = photo_soup.find_all("div", attrs={"class": "wrapper-media"})
-        photo_urls = [x.img["src"] for x in img_div_tag_list if not "data:image" in x.img["src"]]
+        photo_urls = [
+            x.img["src"] for x in img_div_tag_list if not "data:image" in x.img["src"]
+        ]
         propertyphoto_set = []
         download_imag_threading = []
         index = 0
@@ -100,7 +100,7 @@ class ScrapingEngine():
         map_resp = requests.get(map_link, headers=self.headers)
         try:
             latitude, longitude = re.findall("/@(.+?),(.+?),", map_resp.url)[0]
-        except: # noqa
+        except:  # noqa
             latitude, longitude = re.findall("/@(.+?),(.+?),", map_resp.text)[0]
         geolocator = Nominatim(user_agent="geoapiExercises")
         location = geolocator.reverse(latitude + "," + longitude).raw["address"]
@@ -133,7 +133,9 @@ class ScrapingEngine():
 
     def get_amenity(self, amenity_link):
         amenity_soup = self.get_soup(amenity_link)
-        amenity_tag = amenity_soup.find_all("div", attrs={"class": "s-block-text__content"})
+        amenity_tag = amenity_soup.find_all(
+            "div", attrs={"class": "s-block-text__content"}
+        )
         ul_tag = [x.ul for x in amenity_tag if x.ul != None][0]
         community_amenity = [{"name": x.text} for x in ul_tag.find_all("li")]
         interior_features = []
@@ -141,76 +143,45 @@ class ScrapingEngine():
             "propertyamenity_set": community_amenity,
             "propertyunitamenity_set": interior_features,
         }
-        
+
     def get_floorplan(self, floorplans_link):
         propertyunit_set = []
         floor_plan_soup = self.get_soup(floorplans_link)
-        floor_plan_tag_list = floor_plan_soup.find_all("div", attrs={"class": "wrap-model-item"})
-        floor_plan_info = floor_plan_container.find(
-            "div", attrs={"id": "floorplan-overview-content"}
+        floor_plan_tag_list = floor_plan_soup.find_all(
+            "div", attrs={"class": "wrap-model-item"}
         )
-        floor_plan_detail = floor_plan_info.find_all("span")
-        floor_plan_total = ""
-        for item in floor_plan_detail:
-            floor_plan_total += " : " + item.text
-        floor_plan_tatic = floor_plan_total.split("Beds / Baths")
-        for item in floor_plan_tatic:
-            for line in item.splitlines():
-                Bed_info = 0
-                Bath_info = 0
-                Rent_info = 0
-                sqft_info = 0
-                if "*" not in line and "Rent" in line:
-                    real_floorplan = line.split(" : ")
-                    if (
-                        real_floorplan[len(real_floorplan) - 1] != ""
-                        and real_floorplan[len(real_floorplan) - 1] != "+"
-                    ):
-                        sqft_info = real_floorplan[len(real_floorplan) - 1]
-                    elif (
-                        real_floorplan[len(real_floorplan) - 2] != ""
-                        and real_floorplan[len(real_floorplan) - 2] != "+"
-                    ):
-                        sqft_info = real_floorplan[len(real_floorplan) - 2]
-                    elif (
-                        real_floorplan[len(real_floorplan) - 3] != ""
-                        and real_floorplan[len(real_floorplan) - 3] != "+"
-                    ):
-                        sqft_info = real_floorplan[len(real_floorplan) - 3]
-                    else:
-                        sqft_info = real_floorplan[len(real_floorplan) - 4]
-                    sqft_info = int(
-                        sqft_info.replace("+", "").replace(",", "").replace("-", "")
-                    )
-                    for real_floorplan_item in range(len(real_floorplan)):
-                        if "/ " in str(real_floorplan[real_floorplan_item]):
-                            real_info = real_floorplan[real_floorplan_item].split("/")
-                            Bed_info = (
-                                real_info[0].replace("bd", "").replace("\xa0", "")
-                            )
-                            Bath_info = real_info[1].replace("ba", "")
-                            if "studio" in Bed_info.lower():
-                                Bed_info = 0
-                        if "$" in str(real_floorplan[real_floorplan_item]):
-                            Rent_info = real_floorplan[real_floorplan_item].replace(
-                                "from\xa0", ""
-                            )
-                        else:
-                            Rent_info = 0
-                    temp = {
-                        "bedrooms": Bed_info,
-                        "bathrooms": Bath_info,
-                        "floor_area": sqft_info,
-                        "starting_rent": Rent_info,
-                    }
-                    propertyunit_set.append(temp)
+        info_tag_list = [
+            x.find_all("div", attrs={"class": "model-info"})[0]
+            for x in floor_plan_tag_list
+        ]
+        bed = 1
+        bath = 1
+        for item in info_tag_list:
+            try:
+                bed_bath = item.find_all("div", attrs={"class": "model-subtitle"})[
+                    0
+                ].text
+            except:  # noqa
+                bed_bath = item.select_one(":nth-child(2)").text
+            bedrooms = re.findall(r"(\d+)", bed_bath)[1]
+            bathrooms = re.findall(r"(\d+)", bed_bath)[2]
+            sqft_text = item.find_all("div", attrs={"class": "sqft"})[0].text
+            floor_area = re.findall(r"\d+,?\d+", sqft_text)[0]
+            starting_rent = 0
+            propertyunit_set.append(
+                {
+                    "bedrooms": bedrooms,
+                    "bathrooms": bathrooms,
+                    "floor_area": floor_area,
+                    "starting_rent": starting_rent,
+                }
+            )
         return propertyunit_set
 
     def get_soup(self, _url):
         options = Options()
         driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()), 
-            options=options
+            service=Service(ChromeDriverManager().install()), options=options
         )
         driver.get(_url)
         # driver.implicitly_wait(10)
