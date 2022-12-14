@@ -18,19 +18,19 @@ sentry_sdk.init(
 app = Flask(__name__)
 
 
-scraping_data = {}
+scraped_data = None
 
 
 @app.route("/")
 def index():
-    return render_template("index.html", property_info=scraping_data)
+    return render_template("index.html", property_info=scraped_data)
 
 
 @app.route("/scrap", methods=["POST"])
 def scrap():
-    global scraping_data
+    global scraped_data
     _url = request.form.get("url")
-    scraping_data = get_scraping_data(_url)
+    scraped_data = get_scraping_data(_url).scraped_data
     return redirect(url_for("index"))
 
 

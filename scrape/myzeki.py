@@ -21,28 +21,25 @@ class ScrapingEngine:
         }
         self.main_url = scraping_task.source_url
 
-        # try:
-        self.main_soup = self.get_soup(self.main_url)
-        property_info = {}
-        link_group = self.get_link()
-        property_info = link_group.copy()
-        # property_info.update(self.get_cominfo())
+        try:
+            self.main_soup = self.get_soup(self.main_url)
+            property_info = {}
+            link_group = self.get_link()
+            property_info = link_group.copy()
+            property_info.update(self.get_cominfo())
 
-        # property_info.update(self.get_amenity(link_group["amenities_link"]))
-        # property_info["propertyphoto_set"] = self.get_photos(
-        #     link_group["gallery_link"], property_info["name"]
-        # )
-        property_info["propertyunit_set"] = self.get_floorplan(
-            link_group["floorplans_link"]
-        )
-        property_info["state"] = state_lookup_dict[property_info["state"]]
-        property_info["latitude"] = "{:8.5f}".format(float(property_info["latitude"]))
-        property_info["longitude"] = "{:8.5f}".format(float(property_info["longitude"]))
-        scraping_task.scraped_data = property_info.copy()
-        return scraping_task
-        # except Exception as err:
-        #     err = "This url has some problems with run myzeki"
-        #     raise ValidationErr(err)
+            property_info.update(self.get_amenity(link_group["amenities_link"]))
+            property_info["propertyphoto_set"] = self.get_photos(
+                link_group["gallery_link"], property_info["name"]
+            )
+            property_info["propertyunit_set"] = self.get_floorplan(
+                link_group["floorplans_link"]
+            )
+            scraping_task.scraped_data = property_info.copy()
+            return scraping_task
+        except Exception as err:
+            err = "This url has some problems with run myzeki"
+            raise Exception(err)
 
     def get_link(self):
         menu_list = self.main_soup.find_all(
@@ -67,30 +64,6 @@ class ScrapingEngine:
         if not "tour_link" in link_obj:
             link_obj["tour_link"] = self.main_url
         return link_obj
-
-    def get_photos(self, gallery_link, property_name):
-        photo_soup = self.get_soup(gallery_link)
-        img_div_tag_list = photo_soup.find_all("div", attrs={"class": "wrapper-media"})
-        photo_urls = [
-            x.img["src"] for x in img_div_tag_list if not "data:image" in x.img["src"]
-        ]
-        propertyphoto_set = []
-        download_imag_threading = []
-        index = 0
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            for item in photo_urls:
-                index += 1
-                extension_item = "webp"
-                extension = extension_item[0]
-                download_imag_threading.append(
-                    executor.submit(
-                        self.download_img, item, property_name, index, extension
-                    )
-                )
-            for item in download_imag_threading:
-                propertyphoto_set.append(item.result())
-
-        return propertyphoto_set
 
     def get_cominfo(self):
         map_tag = self.main_soup.find_all("library-token", attrs={"type": "address"})[0]
@@ -126,10 +99,33 @@ class ScrapingEngine:
             "postal_code": postal_code,
             "phone": phone,
             "pet_friendly": pet_friendly,
-            "latitude": latitude,
-            "longitude": longitude,
+            "latitude": round(float(latitude), 5),
+            "longitude": round(float(longitude), 5),
         }
         return info
+
+    def get_photos(self, gallery_link, property_name):
+        photo_soup = self.get_soup(gallery_link, delay=25)
+        img_div_tag_list = photo_soup.find_all("div", attrs={"class": "wrapper-media"})
+        photo_urls = [
+            x.img["src"] for x in img_div_tag_list if not "data:image" in x.img["src"]
+        ]
+        propertyphoto_set = []
+        download_imag_threading = []
+        index = 0
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for item in photo_urls:
+                index += 1
+                extension = "webp"
+                download_imag_threading.append(
+                    executor.submit(
+                        self.download_img, item, property_name, index, extension
+                    )
+                )
+            for item in download_imag_threading:
+                propertyphoto_set.append(item.result())
+
+        return propertyphoto_set
 
     def get_amenity(self, amenity_link):
         amenity_soup = self.get_soup(amenity_link)
@@ -154,37 +150,36 @@ class ScrapingEngine:
             x.find_all("div", attrs={"class": "model-info"})[0]
             for x in floor_plan_tag_list
         ]
-        bed = 1
-        bath = 1
         for item in info_tag_list:
             try:
                 bed_bath = item.find_all("div", attrs={"class": "model-subtitle"})[
                     0
                 ].text
+                bedrooms = re.findall(r"(\d+)", bed_bath)[1]
+                bathrooms = re.findall(r"(\d+)", bed_bath)[2]
+                sqft_text = item.find_all("div", attrs={"class": "sqft"})[0].text
+                floor_area = re.findall(r"\d+,?\d+", sqft_text)[0]
+                starting_rent = 0
             except:  # noqa
-                bed_bath = item.select_one(":nth-child(2)").text
-            bedrooms = re.findall(r"(\d+)", bed_bath)[1]
-            bathrooms = re.findall(r"(\d+)", bed_bath)[2]
-            sqft_text = item.find_all("div", attrs={"class": "sqft"})[0].text
-            floor_area = re.findall(r"\d+,?\d+", sqft_text)[0]
-            starting_rent = 0
-            propertyunit_set.append(
-                {
-                    "bedrooms": bedrooms,
-                    "bathrooms": bathrooms,
-                    "floor_area": floor_area,
-                    "starting_rent": starting_rent,
-                }
-            )
+                pass
+            else:
+                propertyunit_set.append(
+                    {
+                        "bedrooms": bedrooms,
+                        "bathrooms": bathrooms,
+                        "floor_area": floor_area,
+                        "starting_rent": starting_rent,
+                    }
+                )
         return propertyunit_set
 
-    def get_soup(self, _url):
+    def get_soup(self, _url, delay=10):
         options = Options()
         driver = webdriver.Chrome(
             service=Service(ChromeDriverManager().install()), options=options
         )
         driver.get(_url)
-        # driver.implicitly_wait(10)
+        driver.implicitly_wait(delay)
         _soup = BeautifulSoup(driver.page_source, features="html.parser")
         driver.close()
         return _soup
