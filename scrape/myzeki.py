@@ -176,14 +176,15 @@ class ScrapingEngine:
     def get_soup(self, _url, delay=10):
         options = Options()
         options.add_argument("--headless")
+        options.add_argument("--window-size=800,5000")
         options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument(
+            "user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+        )
         driver = webdriver.Chrome(
             service=Service(ChromeDriverManager().install()), options=options
         )
-        driver.implicitly_wait(delay)
         driver.get(_url)
-        driver.implicitly_wait(delay)
         _soup = BeautifulSoup(driver.page_source, features="html.parser")
         driver.close()
         return _soup
