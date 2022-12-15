@@ -21,25 +21,25 @@ class ScrapingEngine:
         }
         self.main_url = scraping_task.source_url
 
-        try:
-            self.main_soup = self.get_soup(self.main_url)
-            property_info = {}
-            link_group = self.get_link()
-            property_info = link_group.copy()
-            property_info.update(self.get_cominfo())
+        # try:
+        self.main_soup = self.get_soup(self.main_url)
+        property_info = {}
+        link_group = self.get_link()
+        property_info = link_group.copy()
+        property_info.update(self.get_cominfo())
 
-            property_info.update(self.get_amenity(link_group["amenities_link"]))
-            property_info["propertyphoto_set"] = self.get_photos(
-                link_group["gallery_link"], property_info["name"]
-            )
-            property_info["propertyunit_set"] = self.get_floorplan(
-                link_group["floorplans_link"]
-            )
-            scraping_task.scraped_data = property_info.copy()
-            return scraping_task
-        except Exception as err:
-            err = "This url has some problems with run myzeki"
-            raise Exception(err)
+        property_info.update(self.get_amenity(link_group["amenities_link"]))
+        property_info["propertyphoto_set"] = self.get_photos(
+            link_group["gallery_link"], property_info["name"]
+        )
+        property_info["propertyunit_set"] = self.get_floorplan(
+            link_group["floorplans_link"]
+        )
+        scraping_task.scraped_data = property_info.copy()
+        return scraping_task
+        # except Exception as err:
+        #     err = "This url has some problems with run myzeki"
+        #     raise Exception(err)
 
     def get_link(self):
         menu_list = self.main_soup.find_all(
@@ -175,9 +175,13 @@ class ScrapingEngine:
 
     def get_soup(self, _url, delay=10):
         options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
         driver = webdriver.Chrome(
             service=Service(ChromeDriverManager().install()), options=options
         )
+        driver.implicitly_wait(delay)
         driver.get(_url)
         driver.implicitly_wait(delay)
         _soup = BeautifulSoup(driver.page_source, features="html.parser")

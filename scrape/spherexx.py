@@ -8,40 +8,30 @@ from bs4 import BeautifulSoup
 from django.core.files import File
 from geopy.geocoders import Nominatim
 
-from .base import BaseScrapingEngine
-from .keywordselector import KeywordDrivenCandidate
 
-
-class ScrapingEngine(BaseScrapingEngine, KeywordDrivenCandidate):
-    def __init__(self, source_url):
-        BaseScrapingEngine.__init__(self, source_url)
-        KeywordDrivenCandidate.__init__(self)
-
-    def get_keyword(self):
-        return "spherexx"
-
+class ScrapingEngine:
     def run(self, scraping_task):
         self.main_url = scraping_task.source_url
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:98.0) Gecko/20100101 Firefox/98.0",
         }
-        try:
-            self.main_soup = self.get_soup(self.main_url)
-            nav_link_list = self.get_link()
-            property_info = self.get_information()
-            property_info.update(nav_link_list)
-            property_info["propertyunit_set"] = self.get_floorplan(
-                property_info["floorplans_link"]
-            )
-            property_info["propertyphoto_set"] = self.get_photo(
-                property_info["gallery_link"]
-            )
-            property_info.update(self.get_amenity(property_info["amenities_link"]))
-            scraping_task.scraped_data = property_info.copy()
-            return scraping_task
-        except Exception as err:
-            err = "This url has some problems with run spherexx"
-            raise ValidationErr(err)
+        # try:
+        self.main_soup = self.get_soup(self.main_url)
+        nav_link_list = self.get_link()
+        property_info = self.get_information()
+        property_info.update(nav_link_list)
+        property_info["propertyunit_set"] = self.get_floorplan(
+            property_info["floorplans_link"]
+        )
+        property_info["propertyphoto_set"] = self.get_photo(
+            property_info["gallery_link"]
+        )
+        property_info.update(self.get_amenity(property_info["amenities_link"]))
+        scraping_task.scraped_data = property_info.copy()
+        return scraping_task
+        # except Exception as err:
+        #     err = "This url has some problems with run spherexx"
+        #     raise ValidationErr(err)
 
     def get_link(self):
         main_menubar_soup = self.main_soup.find_all(
